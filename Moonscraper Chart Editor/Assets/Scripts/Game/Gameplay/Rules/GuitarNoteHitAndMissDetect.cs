@@ -36,14 +36,97 @@ public class GuitarNoteHitAndMissDetect {
         m_hitNoteFactory = hitNoteFactory;
         m_missNoteFactory = missNoteFactory;
     }
-	
-	public void Update (float time, HitWindow<GuitarNoteHitKnowledge> hitWindow, uint noteStreak, GuitarSustainHitKnowledge sustainKnowledge)
+
+    private void WriteToLog(string stringToLog)
+    {
+        var logging = false;
+        if (logging)
+        {
+            System.IO.File.AppendAllText(@"C:\Users\Mark\Documents\build\Log.txt", stringToLog + "\n");
+        }
+    }
+
+    private void WriteInputToChart(float time, int inputMask)
+    {
+        var log = time + " Started\n";
+        WriteToLog(log);
+        
+        ChartEditor editor = ChartEditor.Instance;
+        Song currentSong = editor.currentSong;
+
+        var tick = currentSong.TimeToTick(time, currentSong.resolution);
+        int strummedTick = (int)tick;
+        
+        WriteToLog("Time: " + time +
+                   "\nResolution: " + currentSong.resolution +
+                   "\nTick: " + strummedTick);
+
+        int multiplyFactor = 4;
+        int step = GameSettings.step; // snap notes to the step selected
+
+        int resolution = (int)currentSong.resolution;
+
+        float denominator = multiplyFactor / (float)step;
+        int factor = (int)(resolution * denominator);
+
+        log = "Denominator: " + denominator + "\nFactor: " + factor + "\n";
+        WriteToLog(log);
+
+        int roundedPosition = strummedTick / factor;
+        int roundedTick = roundedPosition * factor;
+        uint u_roundedTick = (uint)roundedTick;
+        
+        WriteToLog("roundedPosition: " + roundedPosition +
+                   "\nroundedTick: " + roundedTick +
+                   "\nu_roundedTick: " + u_roundedTick);
+
+        // map input to frets
+        var fret = Note.GuitarFret.Green;
+        if (inputMask == 1)
+        {
+            fret = Note.GuitarFret.Green;
+        }
+        else if (inputMask == 2)
+        {
+            fret = Note.GuitarFret.Red;
+        }
+        else if (inputMask == 4)
+        {
+            fret = Note.GuitarFret.Yellow;
+        }
+        else if (inputMask == 8)
+        {
+            fret = Note.GuitarFret.Blue;
+        }
+        else if (inputMask == 16)
+        {
+            fret = Note.GuitarFret.Orange;
+        }
+
+        // write note to chart
+        var note = new Note(u_roundedTick, fret);
+
+        List<SongObject> currentlyAddingNotes = new List<SongObject>();
+        currentlyAddingNotes.Add(note);
+
+        editor.commandStack.Push(new SongEditAdd(currentlyAddingNotes));
+
+        log = time + " Finished\n";
+        WriteToLog(log);
+    }
+
+    public void Update (float time, HitWindow<GuitarNoteHitKnowledge> hitWindow, uint noteStreak, GuitarSustainHitKnowledge sustainKnowledge)
     {
         // Capture input
         bool strum = GuitarInput.GetStrumInput();
         int inputMask = GuitarInput.GetFretInputMask();
         if (inputMask != previousInputMask)
             canTap = true;
+
+        if (strum)
+        {
+            WriteInputToChart(time, inputMask);
+        }
 
         // What note is the player trying to hit next?
         GuitarNoteHitKnowledge nextNoteToHit = hitWindow.oldestUnhitNote;
