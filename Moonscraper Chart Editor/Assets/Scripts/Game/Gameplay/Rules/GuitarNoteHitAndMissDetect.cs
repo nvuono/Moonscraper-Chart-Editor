@@ -1,4 +1,4 @@
-﻿// Copyright (c) 2016-2020 Alexander Ong
+// Copyright (c) 2016-2020 Alexander Ong
 // See LICENSE in project root for license information.
 
 using System.Collections;
@@ -19,6 +19,10 @@ public class GuitarNoteHitAndMissDetect {
 
     HitNoteFactory m_hitNoteFactory;
     MissNoteFactory m_missNoteFactory;
+
+
+    int prevKeyboardMask = 0; // tracks one-key input+strum for live charting without requiring strumming
+    string[] oneKeyInputSequence = new string[]{"x","c","v","b","n" }; // list of non-interfering keys for one-key live charting
 
     int previousInputMask;
     bool canTap;
@@ -115,19 +119,52 @@ public class GuitarNoteHitAndMissDetect {
         WriteToLog(log);
     }
 
+    /// Helper function to just use keyboard inputs for live charting instead of guitar
+    
+    public int convertKeysToGuitarInputMask(){
+        int retMask = 0;
+
+        if(Input.GetKey(oneKeyInputSequence[0]) ){
+            retMask = 1;
+        }
+        else if(Input.GetKey(oneKeyInputSequence[1])){
+            retMask = 2;
+        }
+        else if(Input.GetKey(oneKeyInputSequence[2])){
+            retMask = 4;
+        }
+        else if(Input.GetKey(oneKeyInputSequence[3])){
+            retMask = 8;
+        }
+        else if(Input.GetKey(oneKeyInputSequence[4])){
+            retMask = 16;
+        }
+        return retMask;
+    }
+
     public void Update (float time, HitWindow<GuitarNoteHitKnowledge> hitWindow, uint noteStreak, GuitarSustainHitKnowledge sustainKnowledge)
     {
         // Capture input
         bool strum = GuitarInput.GetStrumInput();
         int inputMask = GuitarInput.GetFretInputMask();
+        
+        // added keystrum and keyInputMask which are separate from the regular input mode that would require a strum
+        bool keyStrum = false; // separate strum for the one-key input mode
+        int keyInputMask = convertKeysToGuitarInputMask(); // 
+        
+        if(keyInputMask!=0){
+            keyStrum = (prevKeyboardMask!=keyInputMask);
+        }
+
         if (inputMask != previousInputMask)
             canTap = true;
 
         if (strum)
         {
             WriteInputToChart(time, inputMask);
+        }else if(keyStrum){
+            WriteInputToChart(time, keyInputMask);
         }
-
         // What note is the player trying to hit next?
         GuitarNoteHitKnowledge nextNoteToHit = hitWindow.oldestUnhitNote;
 
@@ -152,6 +189,7 @@ public class GuitarNoteHitAndMissDetect {
             BlankWindowDetect(time, strum);
         }
 
+        prevKeyboardMask = keyInputMask;
         previousInputMask = inputMask;
     }
 
